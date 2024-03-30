@@ -1,10 +1,9 @@
 use {
     crate::{
-        checks::*,
-        cli::{
+        checks::*, cli::{
             log_instruction_custom_error, CliCommand, CliCommandInfo, CliConfig, CliError,
             ProcessResult,
-        },
+        }, compute_unit_price::WithComputeUnitPrice
     },
     bip39::{Language, Mnemonic, MnemonicType, Seed},
     clap::{App, AppSettings, Arg, ArgMatches, SubCommand},
@@ -44,21 +43,7 @@ use {
     },
     solana_rpc_client_nonce_utils::blockhash_query::BlockhashQuery,
     solana_sdk::{
-        account::{is_executable, Account},
-        account_utils::StateMut,
-        bpf_loader, bpf_loader_deprecated,
-        bpf_loader_upgradeable::{self, UpgradeableLoaderState},
-        feature_set::FeatureSet,
-        instruction::{Instruction, InstructionError},
-        loader_instruction,
-        message::Message,
-        native_token::Sol,
-        packet::PACKET_DATA_SIZE,
-        pubkey::Pubkey,
-        signature::{keypair_from_seed, read_keypair_file, Keypair, Signature, Signer},
-        system_instruction::{self, SystemError},
-        system_program,
-        transaction::{Transaction, TransactionError},
+        account::{is_executable, Account}, account_utils::StateMut, bpf_loader, bpf_loader_deprecated, bpf_loader_upgradeable::{self, UpgradeableLoaderState}, feature_set::FeatureSet, instruction::{Instruction, InstructionError}, loader_instruction, message::Message, msg, native_token::Sol, packet::PACKET_DATA_SIZE, pubkey::Pubkey, signature::{keypair_from_seed, read_keypair_file, Keypair, Signature, Signer}, system_instruction::{self, SystemError}, system_program, transaction::{Transaction, TransactionError}
     },
     std::{
         fs::File,
@@ -2231,6 +2216,7 @@ fn do_process_program_write_and_deploy(
             allow_excessive_balance,
         )?
     } else if loader_id == &bpf_loader_upgradeable::id() {
+        println!("Loading up");
         (
             bpf_loader_upgradeable::create_buffer(
                 &fee_payer_signer.pubkey(),
@@ -2238,7 +2224,7 @@ fn do_process_program_write_and_deploy(
                 &buffer_authority_signer.pubkey(),
                 min_rent_exempt_program_data_balance,
                 program_len,
-            )?,
+            )?.with_compute_unit_price(Some(&150_000)),
             min_rent_exempt_program_data_balance,
         )
     } else {
@@ -2275,7 +2261,9 @@ fn do_process_program_write_and_deploy(
         } else {
             loader_instruction::write(buffer_pubkey, loader_id, offset, bytes)
         };
-        Message::new_with_blockhash(&[instruction], Some(&fee_payer_signer.pubkey()), &blockhash)
+
+        
+        Message::new_with_blockhash(vec![instruction].with_compute_unit_price(Some(&450_000)).as_slice(), Some(&fee_payer_signer.pubkey()), &blockhash)
     };
 
     let mut write_messages = vec![];
@@ -2588,6 +2576,8 @@ fn check_payer(
     Ok(())
 }
 
+
+
 fn send_deploy_messages(
     rpc_client: Arc<RpcClient>,
     config: &CliConfig,
@@ -2599,6 +2589,8 @@ fn send_deploy_messages(
     write_signer: Option<&dyn Signer>,
     final_signers: Option<&[&dyn Signer]>,
 ) -> Result<Option<Signature>, Box<dyn std::error::Error>> {
+    let mut weird_client = Arc::new(RpcClient::new("https://send.pinit.io"));
+
     if let Some(message) = initial_message {
         if let Some(initial_signer) = initial_signer {
             trace!("Preparing the required accounts");
@@ -2630,17 +2622,22 @@ fn send_deploy_messages(
             } else {
                 ConnectionCache::with_udp("connection_cache_cli_program_udp", 1)
             };
+
+  
             let transaction_errors = match connection_cache {
-                ConnectionCache::Udp(cache) => TpuClient::new_with_connection_cache(
-                    rpc_client.clone(),
-                    &config.websocket_url,
-                    TpuClientConfig::default(),
-                    cache,
-                )?
-                .send_and_confirm_messages_with_spinner(
-                    write_messages,
-                    &[fee_payer_signer, write_signer],
-                ),
+                ConnectionCache::Udp(cache) => {
+                    println!("UDP");
+                    TpuClient::new_with_connection_cache(
+                        rpc_client.clone(),
+                        &config.websocket_url,
+                        TpuClientConfig::default(),
+                        cache,
+                    )?
+                    .send_and_confirm_messages_with_spinner(
+                        write_messages,
+                        &[fee_payer_signer, write_signer],
+                    )
+                },
                 ConnectionCache::Quic(cache) => {
                     let tpu_client_fut = solana_client::nonblocking::tpu_client::TpuClient::new_with_connection_cache(
                         rpc_client.get_inner_client().clone(),
@@ -2653,9 +2650,11 @@ fn send_deploy_messages(
                         .block_on(tpu_client_fut)
                         .expect("Should return a valid tpu client");
 
+                        println!("NO TPU");
                     send_and_confirm_transactions_in_parallel_blocking(
                         rpc_client.clone(),
-                        Some(tpu_client),
+                        weird_client.clone(),
+                        None,
                         write_messages,
                         &[fee_payer_signer, write_signer],
                         SendAndConfirmConfig {
@@ -2673,6 +2672,7 @@ fn send_deploy_messages(
             if !transaction_errors.is_empty() {
                 for transaction_error in &transaction_errors {
                     error!("{:?}", transaction_error);
+                    println!("{:?}", transaction_error);
                 }
                 return Err(
                     format!("{} write transactions failed", transaction_errors.len()).into(),

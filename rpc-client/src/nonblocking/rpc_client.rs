@@ -947,16 +947,18 @@ impl RpcClient {
         } else {
             self.default_cluster_transaction_encoding().await?
         };
+
         let preflight_commitment = CommitmentConfig {
             commitment: config.preflight_commitment.unwrap_or_default(),
         };
-        let preflight_commitment = self.maybe_map_commitment(preflight_commitment).await?;
+        // let preflight_commitment = self.maybe_map_commitment(preflight_commitment).await?;
         let config = RpcSendTransactionConfig {
             encoding: Some(encoding),
             preflight_commitment: Some(preflight_commitment.commitment),
             ..config
         };
         let serialized_encoded = serialize_and_encode(transaction, encoding)?;
+
         let signature_base58_str: String = match self
             .send(
                 RpcRequest::SendTransaction,
@@ -989,9 +991,13 @@ impl RpcClient {
             }
         };
 
+
+     
+
         let signature = signature_base58_str
             .parse::<Signature>()
             .map_err(|err| Into::<ClientError>::into(RpcError::ParseError(err.to_string())))?;
+
         // A mismatching RPC response signature indicates an issue with the RPC node, and
         // should not be passed along to confirmation methods. The transaction may or may
         // not have been submitted to the cluster, so callers should verify the success of

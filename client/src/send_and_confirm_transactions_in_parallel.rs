@@ -59,6 +59,7 @@ pub struct SendAndConfirmConfig {
 /// Sends and confirms transactions concurrently in a sync context
 pub fn send_and_confirm_transactions_in_parallel_blocking<T: Signers + ?Sized>(
     rpc_client: Arc<BlockingRpcClient>,
+    weird_client: Arc<BlockingRpcClient>,
     tpu_client: Option<QuicTpuClient>,
     messages: &[Message],
     signers: &T,
@@ -66,6 +67,7 @@ pub fn send_and_confirm_transactions_in_parallel_blocking<T: Signers + ?Sized>(
 ) -> Result<Vec<Option<TransactionError>>> {
     let fut = send_and_confirm_transactions_in_parallel(
         rpc_client.get_inner_client().clone(),
+        weird_client.get_inner_client().clone(),
         tpu_client,
         messages,
         signers,
@@ -183,6 +185,7 @@ fn progress_from_context_and_block_height(
 
 async fn send_transaction_with_rpc_fallback(
     rpc_client: &RpcClient,
+    weird_client: &RpcClient,
     tpu_client: &Option<QuicTpuClient>,
     transaction: Transaction,
     serialized_transaction: Vec<u8>,
@@ -199,6 +202,14 @@ async fn send_transaction_with_rpc_fallback(
         true
     };
     if send_over_rpc {
+
+        // weird_client.send_transaction_with_config(&transaction, 
+        //     solana_rpc_client_api::config::RpcSendTransactionConfig { skip_preflight: true, 
+        //         preflight_commitment: None, encoding: Some(solana_transaction_status::UiTransactionEncoding::Base58), 
+        //         max_retries: None, 
+        //         min_context_slot: None 
+        //     }).await;
+        
         if let Err(e) = rpc_client.send_transaction(&transaction).await {
             match &e.kind {
                 ErrorKind::Io(_) | ErrorKind::Reqwest(_) => {
@@ -243,6 +254,7 @@ async fn send_transaction_with_rpc_fallback(
 async fn sign_all_messages_and_send<T: Signers + ?Sized>(
     progress_bar: &Option<indicatif::ProgressBar>,
     rpc_client: &RpcClient,
+    weird_client: &RpcClient,
     tpu_client: &Option<QuicTpuClient>,
     messages_with_index: Vec<(usize, Message)>,
     signers: &T,
@@ -264,6 +276,7 @@ async fn sign_all_messages_and_send<T: Signers + ?Sized>(
         futures.push(
             send_transaction_with_rpc_fallback(
                 rpc_client,
+                weird_client,
                 tpu_client,
                 transaction,
                 serialized_transaction.clone(),
@@ -392,6 +405,7 @@ async fn confirm_transactions_till_block_height_and_resend_unexpired_transaction
 /// expire.
 pub async fn send_and_confirm_transactions_in_parallel<T: Signers + ?Sized>(
     rpc_client: Arc<RpcClient>,
+    weird_client: Arc<RpcClient>,
     tpu_client: Option<QuicTpuClient>,
     messages: &[Message],
     signers: &T,
@@ -480,6 +494,7 @@ pub async fn send_and_confirm_transactions_in_parallel<T: Signers + ?Sized>(
         sign_all_messages_and_send(
             &progress_bar,
             &rpc_client,
+            &weird_client,
             &tpu_client,
             messages_with_index,
             signers,

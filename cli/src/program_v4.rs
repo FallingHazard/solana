@@ -906,6 +906,7 @@ fn send_messages(
 
                 send_and_confirm_transactions_in_parallel_blocking(
                     rpc_client.clone(),
+                    rpc_client.clone(),
                     Some(tpu_client),
                     write_messages,
                     &[config.payer, config.authority],
