@@ -2224,7 +2224,7 @@ fn do_process_program_write_and_deploy(
                 &buffer_authority_signer.pubkey(),
                 min_rent_exempt_program_data_balance,
                 program_len,
-            )?.with_compute_unit_price(Some(&150_000)),
+            )?.with_compute_unit_price(Some(&50_000)),
             min_rent_exempt_program_data_balance,
         )
     } else {
@@ -2263,7 +2263,7 @@ fn do_process_program_write_and_deploy(
         };
 
         
-        Message::new_with_blockhash(vec![instruction].with_compute_unit_price(Some(&450_000)).as_slice(), Some(&fee_payer_signer.pubkey()), &blockhash)
+        Message::new_with_blockhash(vec![instruction].with_compute_unit_price(Some(&50_000)).as_slice(), Some(&fee_payer_signer.pubkey()), &blockhash)
     };
 
     let mut write_messages = vec![];
@@ -2589,7 +2589,7 @@ fn send_deploy_messages(
     write_signer: Option<&dyn Signer>,
     final_signers: Option<&[&dyn Signer]>,
 ) -> Result<Option<Signature>, Box<dyn std::error::Error>> {
-    let mut weird_client = Arc::new(RpcClient::new("https://send.pinit.io"));
+    let mut weird_client = Arc::new(RpcClient::new("https://rpc.ironforge.network/mainnet?apiKey=01HTWR63WZ6CYWWKH9RRE1PYYZ"));
 
     if let Some(message) = initial_message {
         if let Some(initial_signer) = initial_signer {
@@ -2658,7 +2658,7 @@ fn send_deploy_messages(
                         write_messages,
                         &[fee_payer_signer, write_signer],
                         SendAndConfirmConfig {
-                            resign_txs_count: Some(5),
+                            resign_txs_count: Some(200),
                             with_spinner: true,
                         },
                     )

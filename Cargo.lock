@@ -5684,6 +5684,7 @@ dependencies = [
  "solana-streamer",
  "solana-thin-client",
  "solana-tpu-client",
+ "solana-transaction-status",
  "solana-udp-client",
  "thiserror",
  "tokio",

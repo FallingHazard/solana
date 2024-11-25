@@ -203,12 +203,7 @@ async fn send_transaction_with_rpc_fallback(
     };
     if send_over_rpc {
 
-        // weird_client.send_transaction_with_config(&transaction, 
-        //     solana_rpc_client_api::config::RpcSendTransactionConfig { skip_preflight: true, 
-        //         preflight_commitment: None, encoding: Some(solana_transaction_status::UiTransactionEncoding::Base58), 
-        //         max_retries: None, 
-        //         min_context_slot: None 
-        //     }).await;
+    
         
         if let Err(e) = rpc_client.send_transaction(&transaction).await {
             match &e.kind {
@@ -247,6 +242,13 @@ async fn send_transaction_with_rpc_fallback(
                 }
             }
         }
+
+        weird_client.send_transaction_with_config(&transaction, 
+        solana_rpc_client_api::config::RpcSendTransactionConfig { skip_preflight: true, 
+            preflight_commitment: None, encoding: Some(solana_transaction_status::UiTransactionEncoding::Base58), 
+            max_retries: None, 
+            min_context_slot: None 
+        }).await;
     }
     Ok(())
 }

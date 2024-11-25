@@ -4559,6 +4559,7 @@ impl Bank {
     ) -> LoadAndExecuteTransactionsOutput {
         let sanitized_txs = batch.sanitized_transactions();
         debug!("processing transactions: {}", sanitized_txs.len());
+        warn!("EXECUTING TXS");
         let mut error_counters = TransactionErrorMetrics::default();
 
         let retryable_transaction_indexes: Vec<_> = batch
@@ -4592,7 +4593,10 @@ impl Bank {
                     error_counters.too_many_account_locks += 1;
                     None
                 }
-                Err(_) => None,
+                Err(e) => {
+                    info!("{:?}",e);
+                    None
+                },
                 Ok(_) => None,
             })
             .collect();
